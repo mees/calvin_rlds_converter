@@ -22,11 +22,20 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
     def _parse_example(ids, annotation):
         episode = []
         for i, id in enumerate(range(ids[0], ids[1]+1)):
+            file_name = f'episode_{id:07}.npz'
+            training_path = os.path.join(FILE_PATH, "training", file_name)
+            validation_path = os.path.join(FILE_PATH, "validation", file_name)
             try:
-                data = np.load(os.path.join(FILE_PATH, f'episode_{id:07}.npz'))
-            except:
-                print(f"Failed to load {os.path.join(FILE_PATH, f'episode_{id:07}.npz')}")
-                return None
+                # Try loading from training directory
+                data = np.load(training_path)
+            except FileNotFoundError:
+                try:
+                    # If not found, try validation directory
+                    data = np.load(validation_path)
+                except FileNotFoundError:
+                    # Print error if not found in either location
+                    print(f"Failed to load {training_path} or {validation_path}")
+                    return None
 
             episode.append({
                 'observation': {
@@ -34,16 +43,16 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
                     'rgb_gripper': data['rgb_gripper'],
                     'rgb_tactile_left': data['rgb_tactile'][..., :3],
                     'rgb_tactile_right': data['rgb_tactile'][..., 3:6],
-                    'depth_static': data['rgb_static'],
-                    'depth_gripper': data['rgb_gripper'],
-                    'depth_tactile': data['rgb_tactile'],
+                    'depth_static': data['depth_static'],
+                    'depth_gripper': data['depth_gripper'],
+                    'depth_tactile': data['depth_tactile'],
                     'robot_obs': np.asarray(data['robot_obs'], dtype=np.float32),
                     'scene_obs': np.asarray(data['scene_obs'], dtype=np.float32),
                     'natural_language_instruction': annotation,
                 },
                 'action': {
                     'actions': np.asarray(data['actions'], dtype=np.float32),
-                    'rel_actions_world': np.asarray(data['rel_actions_world'], dtype=np.float32),
+                    'rel_actions': np.asarray(data['rel_actions'], dtype=np.float32),
                 },
                 'discount': 1.0,
                 'reward': float(i == (ids[1]-ids[0] - 1)),
@@ -74,8 +83,8 @@ class CalvinDataset(MultiThreadedDatasetBuilder):
     RELEASE_NOTES = {
       '1.0.0': 'Initial release.',
     }
-    N_WORKERS = 1              # number of parallel workers for data conversion
-    MAX_PATHS_IN_MEMORY = 10   # number of paths converted & stored in memory before writing to disk
+    N_WORKERS = 40              # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 80   # number of paths converted & stored in memory before writing to disk
                                # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
                                # note that one path may yield multiple episodes and adjust accordingly
     PARSE_FCN = _generate_examples      # handle to parse function from file paths to RLDS episodes
@@ -157,7 +166,7 @@ class CalvinDataset(MultiThreadedDatasetBuilder):
                                 'next 3 dimensions  are euler angles x,y,z), '
                                 'last dimension is open_gripper (-1 is open close, 1 is open).',
                         ),
-                        'rel_actions_world': tfds.features.Tensor(
+                        'rel_actions': tfds.features.Tensor(
                             shape=(7,),
                             dtype=np.float32,
                             doc='relative actions for gripper pose in the robot base frame '
