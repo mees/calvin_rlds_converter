@@ -2,7 +2,7 @@ from typing import Iterator, Tuple, Any
 
 import copy
 import os
-import cv2
+#import cv2
 import glob
 import h5py
 import numpy as np
@@ -12,7 +12,8 @@ import tensorflow_datasets as tfds
 from calvin_dataset.conversion_utils import MultiThreadedDatasetBuilder
 
 
-FILE_PATH = '/nfs/kun2/datasets/calvin'
+#FILE_PATH = '/nfs/kun2/datasets/calvin'
+FILE_PATH = '/home/oier/PycharmProjects/calvin/dataset/task_D_D'
 
 
 def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
@@ -31,7 +32,8 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
                 'observation': {
                     'rgb_static': data['rgb_static'],
                     'rgb_gripper': data['rgb_gripper'],
-                    'rgb_tactile': data['rgb_tactile'],
+                    'rgb_tactile_left': data['rgb_tactile'][..., :3],
+                    'rgb_tactile_right': data['rgb_tactile'][..., 3:6],
                     'depth_static': data['rgb_static'],
                     'depth_gripper': data['rgb_gripper'],
                     'depth_tactile': data['rgb_tactile'],
@@ -65,15 +67,15 @@ def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
         yield _parse_example(ids, annotation)
 
 
-class Calvin(MultiThreadedDatasetBuilder):
+class CalvinDataset(MultiThreadedDatasetBuilder):
     """DatasetBuilder for example dataset."""
 
     VERSION = tfds.core.Version('1.0.0')
     RELEASE_NOTES = {
       '1.0.0': 'Initial release.',
     }
-    N_WORKERS = 40              # number of parallel workers for data conversion
-    MAX_PATHS_IN_MEMORY = 80   # number of paths converted & stored in memory before writing to disk
+    N_WORKERS = 1              # number of parallel workers for data conversion
+    MAX_PATHS_IN_MEMORY = 10   # number of paths converted & stored in memory before writing to disk
                                # -> the higher the faster / more parallel conversion, adjust based on avilable RAM
                                # note that one path may yield multiple episodes and adjust accordingly
     PARSE_FCN = _generate_examples      # handle to parse function from file paths to RLDS episodes
@@ -96,11 +98,17 @@ class Calvin(MultiThreadedDatasetBuilder):
                             encoding_format='jpeg',
                             doc='RGB gripper camera observation.',
                         ),
-                        'rgb_tactile': tfds.features.Image(
-                            shape=(160, 120, 6),
+                        'rgb_tactile_left': tfds.features.Image(
+                            shape=(160, 120, 3),
                             dtype=np.uint8,
                             encoding_format='jpeg',
-                            doc='RGB tactile camera observation.',
+                            doc='RGB tactile left camera observation.',
+                        ),
+                        'rgb_tactile_right': tfds.features.Image(
+                            shape=(160, 120, 3),
+                            dtype=np.uint8,
+                            encoding_format='jpeg',
+                            doc='RGB tactile right camera observation.',
                         ),
                         'depth_static': tfds.features.Tensor(
                             shape=(200, 200),
@@ -187,12 +195,12 @@ class Calvin(MultiThreadedDatasetBuilder):
     def _split_paths(self):
         """Define filepaths for data splits."""
         # firts lets grab the clips that have language annotations in CALVIN
-        train_lang_annotations = np.load(os.path.join(FILE_PATH, "training/annotations/auto_lang_ann.npy"), allow_pickle=True)
+        train_lang_annotations = np.load(os.path.join(FILE_PATH, "training/lang_annotations/auto_lang_ann.npy"), allow_pickle=True)
         train_lang_frame_ids = train_lang_annotations.item()['info']['indx']
         train_lang_language_instructions = train_lang_annotations.item()['language']['ann']
         train_list = [*zip(train_lang_frame_ids, train_lang_language_instructions)]
 
-        val_lang_annotations = np.load(os.path.join(FILE_PATH, "validation/annotations/auto_lang_ann.npy"), allow_pickle=True)
+        val_lang_annotations = np.load(os.path.join(FILE_PATH, "validation/lang_annotations/auto_lang_ann.npy"), allow_pickle=True)
         val_lang_frame_ids = val_lang_annotations.item()['info']['indx']
         val_lang_language_instructions = val_lang_annotations.item()['language']['ann']
         val_list = [*zip(val_lang_frame_ids, val_lang_language_instructions)]
