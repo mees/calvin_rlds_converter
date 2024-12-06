@@ -236,6 +236,7 @@ class CalvinDataset(MultiThreadedDatasetBuilder):
             return np.stack([chunk_starts, chunk_ends], axis=1)
 
         # Split the training and validation episodes into chunks
+        chunk_size = 1000
         train_chunks = split_into_chunks(train_episode_ids, chunk_size)
         val_chunks = split_into_chunks(val_episode_ids, chunk_size)
         # add empty strings to the chunks to make them compatible with the list
