@@ -18,7 +18,7 @@ FILE_PATH = '/nfs/kun2/datasets/calvin'
 def _generate_examples(paths) -> Iterator[Tuple[str, Any]]:
     """Yields episodes for list of data paths."""
 
-    def _parse_example(ids):
+    def _parse_example(ids, annotation):
         episode = []
         for i, id in enumerate(range(ids[0], ids[1]+1)):
             try:
@@ -230,11 +230,11 @@ class Calvin(MultiThreadedDatasetBuilder):
         # Split the training and validation episodes into chunks
         train_chunks = split_into_chunks(train_episode_ids, chunk_size)
         val_chunks = split_into_chunks(val_episode_ids, chunk_size)
-
+        # add empty strings to the chunks to make them compatible with the list
         train_chunks_with_empty_strings = [(tuple(chunk), "") for chunk in train_chunks]
         val_chunks_with_empty_strings = [(tuple(chunk), "") for chunk in val_chunks]
 
-
+        # concatenate sequences with and without language, there will be some duplicates
         return {
             'train': train_list + train_chunks_with_empty_strings,
             'val': val_list + val_chunks_with_empty_strings,
