@@ -186,11 +186,57 @@ class Calvin(MultiThreadedDatasetBuilder):
 
     def _split_paths(self):
         """Define filepaths for data splits."""
-        train_annotations = np.load(os.path.join(FILE_PATH, "training/ep_start_end_ids.npy"), allow_pickle=True)
-        val_annotations = np.load(os.path.join(FILE_PATH, "validation/ep_start_end_ids.npy"), allow_pickle=True)
+        # firts lets grab the clips that have language annotations in CALVIN
+        train_lang_annotations = np.load(os.path.join(FILE_PATH, "training/annotations/auto_lang_ann.npy"), allow_pickle=True)
+        train_lang_frame_ids = train_lang_annotations.item()['info']['indx']
+        train_lang_language_instructions = train_lang_annotations.item()['language']['ann']
+        train_list = [*zip(train_lang_frame_ids, train_lang_language_instructions)]
+
+        val_lang_annotations = np.load(os.path.join(FILE_PATH, "validation/annotations/auto_lang_ann.npy"), allow_pickle=True)
+        val_lang_frame_ids = val_lang_annotations.item()['info']['indx']
+        val_lang_language_instructions = val_lang_annotations.item()['language']['ann']
+        val_list = [*zip(val_lang_frame_ids, val_lang_language_instructions)]
+
+        train_episode_ids = np.load(os.path.join(FILE_PATH, "training/ep_start_end_ids.npy"), allow_pickle=True)
+        val_episode_ids = np.load(os.path.join(FILE_PATH, "validation/ep_start_end_ids.npy"), allow_pickle=True)
+
+        def split_into_chunks(eps, chunk_size):
+            """
+            Splits the episodes into fixed-size chunks.
+
+            Args:
+                eps (np.ndarray): Array of [start, end] indices for episodes.
+                chunk_size (int): The size of each chunk.
+
+            Returns:
+                np.ndarray: Array of [start, end] indices for chunks.
+            """
+            # Initialize lists to hold chunk start and end indices
+            chunk_starts = []
+            chunk_ends = []
+
+            # Process each episode
+            for start, end in eps:
+                starts = np.arange(start, end + 1, chunk_size)
+                ends = np.minimum(starts + chunk_size - 1, end)
+                chunk_starts.append(starts)
+                chunk_ends.append(ends)
+
+            # Combine all chunks into a single array
+            chunk_starts = np.concatenate(chunk_starts)
+            chunk_ends = np.concatenate(chunk_ends)
+            return np.stack([chunk_starts, chunk_ends], axis=1)
+
+        # Split the training and validation episodes into chunks
+        train_chunks = split_into_chunks(train_episode_ids, chunk_size)
+        val_chunks = split_into_chunks(val_episode_ids, chunk_size)
+
+        train_chunks_with_empty_strings = [(tuple(chunk), "") for chunk in train_chunks]
+        val_chunks_with_empty_strings = [(tuple(chunk), "") for chunk in val_chunks]
+
 
         return {
-            'train': train_annotations.tolist(),
-            'val': val_annotations.tolist(),
+            'train': train_list + train_chunks_with_empty_strings,
+            'val': val_list + val_chunks_with_empty_strings,
         }
 
