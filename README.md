@@ -13,7 +13,7 @@ conda env create -f environment_ubuntu.yml
 
 Then activate the environment using:
 ```
-conda activate rlds_env
+conda activate rlds_env_calvin
 ```
 
 If you want to manually create an environment, the key packages to install are `tensorflow`, 
